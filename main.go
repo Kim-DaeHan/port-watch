@@ -23,29 +23,41 @@ func getActivePorts() ([]PortInfo, error) {
 	cmd := exec.Command("lsof", "-i", "-P", "-n")
 	output, err := cmd.Output()
 	if err != nil {
+		fmt.Println("Error executing lsof:", err)
 		return nil, err
 	}
 
 	var ports []PortInfo
 	lines := strings.Split(string(output), "\n")
 
-	for _, line := range lines[1:] { // 헤더 스킵
+	for _, line := range lines[1:] {
 		fields := strings.Fields(line)
 		if len(fields) < 9 {
 			continue
 		}
 
-		if strings.Contains(fields[8], "LISTEN") {
-			portInfo := PortInfo{
-				ProcessName: fields[0],
-				PID:         fields[1],
-				Protocol:    fields[7],
-				Port:        strings.Split(fields[8], ":")[1],
-			}
-			ports = append(ports, portInfo)
+		addr := fields[8]
+		protocol := "TCP"
+		if strings.Contains(fields[7], "UDP") {
+			protocol = "UDP"
 		}
+
+		parts := strings.Split(addr, ":")
+		if len(parts) < 2 {
+			continue
+		}
+
+		portInfo := PortInfo{
+			ProcessName: fields[0],
+			PID:         fields[1],
+			Protocol:    protocol,
+			Port:        parts[len(parts)-1],
+		}
+		fmt.Printf("Found port: %+v\n", portInfo)
+		ports = append(ports, portInfo)
 	}
 
+	fmt.Printf("Total ports found: %d\n", len(ports))
 	return ports, nil
 }
 
@@ -53,43 +65,48 @@ func main() {
 	myApp := app.New()
 	window := myApp.NewWindow("Port Watch")
 
-	// 리스트 위젯 생성
+	var ports []PortInfo
 	list := widget.NewList(
-		func() int { return 0 },
+		func() int {
+			fmt.Printf("List length called: %d\n", len(ports))
+			return len(ports)
+		},
 		func() fyne.CanvasObject {
 			return widget.NewLabel("Template")
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
-			// 업데이트 시 구현
+			label := item.(*widget.Label)
+			fmt.Printf("Updating item %d\n", id)
+			if id < len(ports) {
+				port := ports[id]
+				text := fmt.Sprintf("%s (PID:%s) - %s:%s",
+					port.ProcessName,
+					port.PID,
+					port.Protocol,
+					port.Port)
+				fmt.Printf("Setting text: %s\n", text)
+				label.SetText(text)
+			}
 		},
 	)
 
-	// 자동 새로고침 함수
 	updateList := func() {
-		ports, err := getActivePorts()
+		newPorts, err := getActivePorts()
 		if err != nil {
 			fmt.Println("Error:", err)
 			return
 		}
-
-		list.Length = func() int { return len(ports) }
-		list.UpdateItem = func(id widget.ListItemID, item fyne.CanvasObject) {
-			label := item.(*widget.Label)
-			label.SetText(fmt.Sprintf("%s (PID: %s) - %s:%s",
-				ports[id].ProcessName,
-				ports[id].PID,
-				ports[id].Protocol,
-				ports[id].Port))
-		}
+		fmt.Printf("UpdateList called with %d ports\n", len(newPorts))
+		ports = newPorts
+		list.Refresh()
 	}
-	list.Refresh()
 
 	// 초기 데이터 로드
 	updateList()
 
 	// 5초마다 자동 새로고침
-	ticker := time.NewTicker(5 * time.Second)
 	go func() {
+		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
 			updateList()
 		}
@@ -100,6 +117,6 @@ func main() {
 		list,
 	))
 
-	window.Resize(fyne.NewSize(400, 600))
+	window.Resize(fyne.NewSize(600, 800))
 	window.ShowAndRun()
 }
