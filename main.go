@@ -53,7 +53,6 @@ func getActivePorts() ([]PortInfo, error) {
 			Protocol:    protocol,
 			Port:        parts[len(parts)-1],
 		}
-		fmt.Printf("Found port: %+v\n", portInfo)
 		ports = append(ports, portInfo)
 	}
 
@@ -68,7 +67,6 @@ func main() {
 	var ports []PortInfo
 	list := widget.NewList(
 		func() int {
-			fmt.Printf("Length function called, returning: %d\n", len(ports))
 			return len(ports)
 		},
 		func() fyne.CanvasObject {
@@ -77,6 +75,9 @@ func main() {
 			return label
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
+			fmt.Println("id:", id)
+			fmt.Println("item:", item)
+
 			label := item.(*widget.Label)
 			port := ports[id]
 			text := fmt.Sprintf("%s (PID:%s) - %s:%s",
@@ -84,7 +85,6 @@ func main() {
 				port.PID,
 				port.Protocol,
 				port.Port)
-			fmt.Printf("Setting text for id %d: %s\n", id, text)
 			label.SetText(text)
 		},
 	)
@@ -95,7 +95,6 @@ func main() {
 			fmt.Println("Error:", err)
 			return
 		}
-		fmt.Printf("UpdateList called with %d ports\n", len(newPorts))
 		ports = newPorts
 		list.Refresh()
 	}
@@ -111,11 +110,17 @@ func main() {
 		}
 	}()
 
-	window.SetContent(container.NewVBox(
-		widget.NewLabel("실행 중인 포트 목록"),
-		list,
-	))
+	listContainer := container.NewVScroll(list)
 
+	content := container.NewBorder(
+		widget.NewLabel("실행 중인 포트 목록"), // 상단
+		nil,           // 하단
+		nil,           // 좌측
+		nil,           // 우측
+		listContainer, // 중앙 (나머지 공간 모두 차지)
+	)
+
+	window.SetContent(content)
 	window.Resize(fyne.NewSize(600, 800))
 	window.ShowAndRun()
 }
