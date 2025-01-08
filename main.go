@@ -68,25 +68,24 @@ func main() {
 	var ports []PortInfo
 	list := widget.NewList(
 		func() int {
-			fmt.Printf("List length called: %d\n", len(ports))
+			fmt.Printf("Length function called, returning: %d\n", len(ports))
 			return len(ports)
 		},
 		func() fyne.CanvasObject {
-			return widget.NewLabel("Template")
+			label := widget.NewLabel("")
+			label.Resize(fyne.NewSize(550, 30))
+			return label
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			label := item.(*widget.Label)
-			fmt.Printf("Updating item %d\n", id)
-			if id < len(ports) {
-				port := ports[id]
-				text := fmt.Sprintf("%s (PID:%s) - %s:%s",
-					port.ProcessName,
-					port.PID,
-					port.Protocol,
-					port.Port)
-				fmt.Printf("Setting text: %s\n", text)
-				label.SetText(text)
-			}
+			port := ports[id]
+			text := fmt.Sprintf("%s (PID:%s) - %s:%s",
+				port.ProcessName,
+				port.PID,
+				port.Protocol,
+				port.Port)
+			fmt.Printf("Setting text for id %d: %s\n", id, text)
+			label.SetText(text)
 		},
 	)
 
