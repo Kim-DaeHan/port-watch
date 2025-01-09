@@ -3,12 +3,14 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -23,7 +25,6 @@ func getActivePorts() ([]PortInfo, error) {
 	cmd := exec.Command("lsof", "-i", "-P", "-n")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Error executing lsof:", err)
 		return nil, err
 	}
 
@@ -32,7 +33,11 @@ func getActivePorts() ([]PortInfo, error) {
 
 	for _, line := range lines[1:] {
 		fields := strings.Fields(line)
-		if len(fields) < 9 {
+		if len(fields) < 8 {
+			continue
+		}
+
+		if fields[len(fields)-1] != "(LISTEN)" {
 			continue
 		}
 
@@ -53,11 +58,39 @@ func getActivePorts() ([]PortInfo, error) {
 			Protocol:    protocol,
 			Port:        parts[len(parts)-1],
 		}
+
 		ports = append(ports, portInfo)
 	}
 
-	fmt.Printf("Total ports found: %d\n", len(ports))
 	return ports, nil
+}
+
+// 프로세스 종료 가능 여부 확인 함수
+func canKillProcess(processName string, pid string) bool {
+	// 종료 불가능한 프로세스 목록
+	protectedProcesses := map[string]bool{
+		"systemd":      true,
+		"sshd":         true,
+		"init":         true,
+		"kernel":       true,
+		"launchd":      true, // macOS 시스템 프로세스
+		"WindowServer": true, // macOS 시스템 프로세스
+		"loginwindow":  true, // macOS 시스템 프로세스
+	}
+
+	if protectedProcesses[processName] {
+		return false
+	}
+
+	// PID가 1000 미만인 경우는 대부분 시스템 프로세스
+	pidNum, _ := strconv.Atoi(pid)
+	return pidNum >= 1000
+}
+
+// 프로세스 종료 함수 추가
+func killProcess(pid string) error {
+	cmd := exec.Command("kill", pid)
+	return cmd.Run()
 }
 
 func main() {
@@ -65,30 +98,9 @@ func main() {
 	window := myApp.NewWindow("Port Watch")
 
 	var ports []PortInfo
-	list := widget.NewList(
-		func() int {
-			return len(ports)
-		},
-		func() fyne.CanvasObject {
-			label := widget.NewLabel("")
-			label.Resize(fyne.NewSize(550, 30))
-			return label
-		},
-		func(id widget.ListItemID, item fyne.CanvasObject) {
-			fmt.Println("id:", id)
-			fmt.Println("item:", item)
+	var list *widget.List
 
-			label := item.(*widget.Label)
-			port := ports[id]
-			text := fmt.Sprintf("%s (PID:%s) - %s:%s",
-				port.ProcessName,
-				port.PID,
-				port.Protocol,
-				port.Port)
-			label.SetText(text)
-		},
-	)
-
+	// updateList 함수를 먼저 선언
 	updateList := func() {
 		newPorts, err := getActivePorts()
 		if err != nil {
@@ -98,6 +110,53 @@ func main() {
 		ports = newPorts
 		list.Refresh()
 	}
+
+	// 리스트 정의
+	list = widget.NewList(
+		func() int {
+			return len(ports)
+		},
+		func() fyne.CanvasObject {
+			return container.NewHBox(
+				widget.NewLabel(""),
+				widget.NewButton("종료", func() {}),
+			)
+		},
+		func(id widget.ListItemID, item fyne.CanvasObject) {
+			container := item.(*fyne.Container)
+			label := container.Objects[0].(*widget.Label)
+			button := container.Objects[1].(*widget.Button)
+
+			port := ports[id]
+			text := fmt.Sprintf("%s (PID:%s) - %s:%s",
+				port.ProcessName,
+				port.PID,
+				port.Protocol,
+				port.Port)
+			label.SetText(text)
+
+			// 프로세스 종료 가능 여부에 따라 버튼 표시/숨김
+			if canKillProcess(port.ProcessName, port.PID) {
+				button.Show()
+				button.OnTapped = func() {
+					dialog.ShowConfirm("프로세스 종료",
+						fmt.Sprintf("정말로 %s(PID:%s) 프로세스를 종료하시겠습니까?",
+							port.ProcessName, port.PID),
+						func(ok bool) {
+							if ok {
+								if err := killProcess(port.PID); err != nil {
+									dialog.ShowError(err, window)
+								} else {
+									updateList()
+								}
+							}
+						}, window)
+				}
+			} else {
+				button.Hide()
+			}
+		},
+	)
 
 	// 초기 데이터 로드
 	updateList()
