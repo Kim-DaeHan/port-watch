@@ -116,26 +116,6 @@ func killProcess(pid string) error {
 	return nil
 }
 
-// 커스텀 버튼 위젯 수정
-type CustomButton struct {
-	widget.Button
-	isDangerous bool
-}
-
-func NewCustomButton(text string, tapped func(), isDangerous bool) *CustomButton {
-	button := &CustomButton{}
-	button.ExtendBaseWidget(button)
-	button.SetText(text)
-	button.OnTapped = tapped
-	button.isDangerous = isDangerous
-	if isDangerous {
-		button.Importance = widget.DangerImportance
-	} else {
-		button.Importance = widget.MediumImportance
-	}
-	return button
-}
-
 func main() {
 	myApp := app.New()
 	window := myApp.NewWindow("Port Manager")
@@ -169,14 +149,14 @@ func main() {
 			return len(ports)
 		},
 		func() fyne.CanvasObject {
-			btn := widget.NewButton("Terminate", nil)
+			button := widget.NewButton("Terminate", nil)
 			return container.NewHBox(
 				container.NewVBox(
 					widget.NewLabel(""),
 					widget.NewLabel(""),
 				),
 				layout.NewSpacer(),
-				btn,
+				button,
 			)
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
@@ -199,17 +179,21 @@ func main() {
 			detailsLabel.TextStyle = fyne.TextStyle{Monospace: true}
 			detailsLabel.Resize(fyne.NewSize(400, 30))
 
-			if canKill, isDangerous := canKillProcess(port.ProcessName, port.PID); canKill {
+			canKill, isDangerous := canKillProcess(port.ProcessName, port.PID)
+			if canKill {
+				if isDangerous {
+					button.Importance = widget.DangerImportance
+				} else {
+					button.Importance = widget.MediumImportance
+				}
 				button.Show()
-				button.Importance = widget.MediumImportance
 				button.Resize(fyne.NewSize(100, 40))
 
-				// 마우스 이벤트 대신 hover 상태를 사용
 				button.OnTapped = func() {
 					if isDangerous {
 						dialog.ShowConfirm(
-							"Warning: Dangerous Process",
-							fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?\nThis is a system-critical process.",
+							"경고: 위험한 프로세스",
+							fmt.Sprintf("%s (PID: %s)을 종료하시겠습니까?\n이 프로세스는 시스템에 중요합니다.",
 								port.ProcessName,
 								port.PID),
 							func(ok bool) {
@@ -225,8 +209,8 @@ func main() {
 						)
 					} else {
 						dialog.ShowConfirm(
-							"Terminate Process",
-							fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?",
+							"프로세스 종료",
+							fmt.Sprintf("%s (PID: %s)을 종료하시겠습니까?",
 								port.ProcessName,
 								port.PID),
 							func(ok bool) {
