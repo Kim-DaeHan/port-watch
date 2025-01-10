@@ -166,7 +166,6 @@ func main() {
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			container := item.(*fyne.Container)
-
 			infoContainer := container.Objects[0].(*fyne.Container)
 			processLabel := infoContainer.Objects[0].(*widget.Label)
 			detailsLabel := infoContainer.Objects[1].(*widget.Label)
@@ -188,11 +187,6 @@ func main() {
 
 			canKill, isDangerous := canKillProcess(port.ProcessName, port.PID)
 			if canKill {
-				if isDangerous {
-					button.Importance = widget.DangerImportance
-				} else {
-					button.Importance = widget.MediumImportance
-				}
 				button.Show()
 				button.OnTapped = func() {
 					if isDangerous {
