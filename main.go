@@ -67,25 +67,38 @@ func getActivePorts() ([]PortInfo, error) {
 }
 
 // 프로세스 종료 가능 여부 확인 함수
-func canKillProcess(processName string, pid string) bool {
-	// 종료 불가능한 프로세스 목록
+func canKillProcess(processName string, pid string) (bool, bool) {
+	// 종료 불가능한 프로세스
 	protectedProcesses := map[string]bool{
 		"systemd":      true,
 		"sshd":         true,
 		"init":         true,
 		"kernel":       true,
-		"launchd":      true, // macOS 시스템 프로세스
-		"WindowServer": true, // macOS 시스템 프로세스
-		"loginwindow":  true, // macOS 시스템 프로세스
+		"launchd":      true,
+		"WindowServer": true,
+		"loginwindow":  true,
+	}
+
+	// 종료 위험한 프로세스
+	dangerousProcesses := map[string]bool{
+		"postgres":  true,
+		"mongod":    true,
+		"redis-ser": true,
+		"mysqld":    true,
+		"nginx":     true,
+		"docker":    true,
 	}
 
 	if protectedProcesses[processName] {
-		return false
+		return false, false
 	}
 
-	// PID가 1000 미만인 경우는 대부분 시스템 프로세스
 	pidNum, _ := strconv.Atoi(pid)
-	return pidNum >= 1000
+	if pidNum < 1000 {
+		return false, false
+	}
+
+	return true, dangerousProcesses[processName]
 }
 
 // 프로세스 종료 함수 추가
@@ -101,6 +114,26 @@ func killProcess(pid string) error {
 	}
 
 	return nil
+}
+
+// 커스텀 버튼 위젯 수정
+type CustomButton struct {
+	widget.Button
+	isDangerous bool
+}
+
+func NewCustomButton(text string, tapped func(), isDangerous bool) *CustomButton {
+	button := &CustomButton{}
+	button.ExtendBaseWidget(button)
+	button.SetText(text)
+	button.OnTapped = tapped
+	button.isDangerous = isDangerous
+	if isDangerous {
+		button.Importance = widget.DangerImportance
+	} else {
+		button.Importance = widget.MediumImportance
+	}
+	return button
 }
 
 func main() {
@@ -136,16 +169,15 @@ func main() {
 			return len(ports)
 		},
 		func() fyne.CanvasObject {
-			item := container.NewHBox(
+			btn := widget.NewButton("Terminate", nil)
+			return container.NewHBox(
 				container.NewVBox(
-					widget.NewLabel(""), // 프로세스 이름
-					widget.NewLabel(""), // 상세 정보
+					widget.NewLabel(""),
+					widget.NewLabel(""),
 				),
 				layout.NewSpacer(),
-				widget.NewButton("Terminate", nil),
+				btn,
 			)
-			item.Resize(fyne.NewSize(780, 60)) // 아이템 크기 설정
-			return item
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			container := item.(*fyne.Container)
@@ -167,27 +199,48 @@ func main() {
 			detailsLabel.TextStyle = fyne.TextStyle{Monospace: true}
 			detailsLabel.Resize(fyne.NewSize(400, 30))
 
-			if canKillProcess(port.ProcessName, port.PID) {
+			if canKill, isDangerous := canKillProcess(port.ProcessName, port.PID); canKill {
 				button.Show()
-				button.Importance = widget.DangerImportance
+				button.Importance = widget.MediumImportance
 				button.Resize(fyne.NewSize(100, 40))
+
+				// 마우스 이벤트 대신 hover 상태를 사용
 				button.OnTapped = func() {
-					dialog.ShowConfirm(
-						"Terminate Process",
-						fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?",
-							port.ProcessName,
-							port.PID),
-						func(ok bool) {
-							if ok {
-								if err := killProcess(port.PID); err != nil {
-									dialog.ShowError(err, window)
-								} else {
-									updateList()
+					if isDangerous {
+						dialog.ShowConfirm(
+							"Warning: Dangerous Process",
+							fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?\nThis is a system-critical process.",
+								port.ProcessName,
+								port.PID),
+							func(ok bool) {
+								if ok {
+									if err := killProcess(port.PID); err != nil {
+										dialog.ShowError(err, window)
+									} else {
+										updateList()
+									}
 								}
-							}
-						},
-						window,
-					)
+							},
+							window,
+						)
+					} else {
+						dialog.ShowConfirm(
+							"Terminate Process",
+							fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?",
+								port.ProcessName,
+								port.PID),
+							func(ok bool) {
+								if ok {
+									if err := killProcess(port.PID); err != nil {
+										dialog.ShowError(err, window)
+									} else {
+										updateList()
+									}
+								}
+							},
+							window,
+						)
+					}
 				}
 			} else {
 				button.Hide()
