@@ -150,21 +150,28 @@ func main() {
 		},
 		func() fyne.CanvasObject {
 			button := widget.NewButton("Terminate", nil)
+			button.Resize(fyne.NewSize(100, 35))
+
 			return container.NewHBox(
 				container.NewVBox(
 					widget.NewLabel(""),
 					widget.NewLabel(""),
 				),
 				layout.NewSpacer(),
-				button,
+				container.NewHBox(
+					layout.NewSpacer(),
+					button,
+				),
 			)
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			container := item.(*fyne.Container)
+
 			infoContainer := container.Objects[0].(*fyne.Container)
 			processLabel := infoContainer.Objects[0].(*widget.Label)
 			detailsLabel := infoContainer.Objects[1].(*widget.Label)
-			button := container.Objects[2].(*widget.Button)
+			buttonContainer := container.Objects[2].(*fyne.Container)
+			button := buttonContainer.Objects[1].(*widget.Button)
 
 			port := ports[id]
 
@@ -187,8 +194,6 @@ func main() {
 					button.Importance = widget.MediumImportance
 				}
 				button.Show()
-				button.Resize(fyne.NewSize(100, 40))
-
 				button.OnTapped = func() {
 					if isDangerous {
 						dialog.ShowConfirm(
