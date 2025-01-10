@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -104,12 +105,12 @@ func killProcess(pid string) error {
 
 func main() {
 	myApp := app.New()
-	window := myApp.NewWindow("Port Watch")
+	window := myApp.NewWindow("Port Manager")
+	window.Resize(fyne.NewSize(800, 600))
 
 	var ports []PortInfo
 	var list *widget.List
 
-	// updateList 함수를 먼저 선언
 	updateList := func() {
 		newPorts, err := getActivePorts()
 		if err != nil {
@@ -117,8 +118,17 @@ func main() {
 			return
 		}
 		ports = newPorts
-		list.Refresh()
+		if list != nil {
+			list.Refresh()
+		}
 	}
+
+	// 헤더 생성
+	header := container.NewHBox(
+		widget.NewLabel("Active Ports"),
+		layout.NewSpacer(),
+		widget.NewButton("Refresh", updateList),
+	)
 
 	// 리스트 정의
 	list = widget.NewList(
@@ -126,31 +136,47 @@ func main() {
 			return len(ports)
 		},
 		func() fyne.CanvasObject {
-			return container.NewHBox(
-				widget.NewLabel(""),
-				widget.NewButton("종료", func() {}),
+			item := container.NewHBox(
+				container.NewVBox(
+					widget.NewLabel(""), // 프로세스 이름
+					widget.NewLabel(""), // 상세 정보
+				),
+				layout.NewSpacer(),
+				widget.NewButton("Terminate", nil),
 			)
+			item.Resize(fyne.NewSize(780, 60)) // 아이템 크기 설정
+			return item
 		},
 		func(id widget.ListItemID, item fyne.CanvasObject) {
 			container := item.(*fyne.Container)
-			label := container.Objects[0].(*widget.Label)
-			button := container.Objects[1].(*widget.Button)
+			infoContainer := container.Objects[0].(*fyne.Container)
+			processLabel := infoContainer.Objects[0].(*widget.Label)
+			detailsLabel := infoContainer.Objects[1].(*widget.Label)
+			button := container.Objects[2].(*widget.Button)
 
 			port := ports[id]
-			text := fmt.Sprintf("%s (PID:%s) - %s:%s",
-				port.ProcessName,
+
+			processLabel.SetText(port.ProcessName)
+			processLabel.TextStyle = fyne.TextStyle{Bold: true}
+			processLabel.Resize(fyne.NewSize(400, 30))
+
+			detailsLabel.SetText(fmt.Sprintf("PID: %s • %s:%s",
 				port.PID,
 				port.Protocol,
-				port.Port)
-			label.SetText(text)
+				port.Port))
+			detailsLabel.TextStyle = fyne.TextStyle{Monospace: true}
+			detailsLabel.Resize(fyne.NewSize(400, 30))
 
-			// 프로세스 종료 가능 여부에 따라 버튼 표시/숨김
 			if canKillProcess(port.ProcessName, port.PID) {
 				button.Show()
+				button.Importance = widget.DangerImportance
+				button.Resize(fyne.NewSize(100, 40))
 				button.OnTapped = func() {
-					dialog.ShowConfirm("프로세스 종료",
-						fmt.Sprintf("정말로 %s(PID:%s) 프로세스를 종료하시겠습니까?",
-							port.ProcessName, port.PID),
+					dialog.ShowConfirm(
+						"Terminate Process",
+						fmt.Sprintf("Are you sure you want to terminate %s (PID: %s)?",
+							port.ProcessName,
+							port.PID),
 						func(ok bool) {
 							if ok {
 								if err := killProcess(port.PID); err != nil {
@@ -159,7 +185,9 @@ func main() {
 									updateList()
 								}
 							}
-						}, window)
+						},
+						window,
+					)
 				}
 			} else {
 				button.Hide()
@@ -167,10 +195,7 @@ func main() {
 		},
 	)
 
-	// 초기 데이터 로드
-	updateList()
-
-	// 5초마다 자동 새로고침
+	// 자동 새로고침
 	go func() {
 		ticker := time.NewTicker(5 * time.Second)
 		for range ticker.C {
@@ -178,17 +203,23 @@ func main() {
 		}
 	}()
 
-	listContainer := container.NewVScroll(list)
-
-	content := container.NewBorder(
-		widget.NewLabel("실행 중인 포트 목록"), // 상단
-		nil,           // 하단
-		nil,           // 좌측
-		nil,           // 우측
-		listContainer, // 중앙 (나머지 공간 모두 차지)
+	// 메인 컨테이너 구성
+	mainContainer := container.NewBorder(
+		container.NewVBox(
+			header,
+			widget.NewSeparator(),
+		),
+		nil,
+		nil,
+		nil,
+		container.NewVScroll(list),
 	)
 
-	window.SetContent(content)
-	window.Resize(fyne.NewSize(600, 800))
+	window.SetContent(mainContainer)
+	window.CenterOnScreen()
+
+	// 초기 데이터 로드
+	updateList()
+
 	window.ShowAndRun()
 }
