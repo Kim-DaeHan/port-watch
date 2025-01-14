@@ -192,7 +192,7 @@ func main() {
 					if isDangerous {
 						dialog.ShowConfirm(
 							"경고: 위험한 프로세스",
-							fmt.Sprintf("%s (PID: %s)을 종료하시겠습니까?\n이 프로세스는 시스템에 중요합니다.ㄴㄴ",
+							fmt.Sprintf("%s (PID: %s)을 종료하시겠습니까?\n이 프로세스는 시스템에 중요합니다.",
 								port.ProcessName,
 								port.PID),
 							func(ok bool) {
