@@ -103,7 +103,7 @@ func canKillProcess(processName string, pid string) (bool, bool) {
 
 // 프로세스 종료 함수 추가
 func killProcess(pid string) error {
-	// 먼저 일반적인 SIGTERM으로 종료 시도.
+	// 먼저 일반적인 SIGTERM으로 종료 시도
 	cmd := exec.Command("kill", pid)
 	err := cmd.Run()
 
