@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -15,14 +16,17 @@ import (
 )
 
 type PortManagerUI struct {
-	window fyne.Window
-	ports  []types.PortInfo
-	list   *widget.List
+	window        fyne.Window
+	ports         []types.PortInfo
+	list          *widget.List
+	searchEntry   *widget.Entry
+	filteredPorts []types.PortInfo
 }
 
 func NewPortManagerUI(window fyne.Window) *PortManagerUI {
 	return &PortManagerUI{
-		window: window,
+		window:        window,
+		filteredPorts: []types.PortInfo{},
 	}
 }
 
@@ -33,21 +37,45 @@ func (ui *PortManagerUI) updateList() {
 		return
 	}
 	ui.ports = newPorts
+	ui.filterPorts(ui.searchEntry.Text)
+}
+
+func (ui *PortManagerUI) filterPorts(searchText string) {
+	if searchText == "" {
+		ui.filteredPorts = ui.ports
+	} else {
+		ui.filteredPorts = []types.PortInfo{}
+		searchText = strings.ToLower(searchText)
+		for _, port := range ui.ports {
+			if strings.Contains(strings.ToLower(port.ProcessName), searchText) {
+				ui.filteredPorts = append(ui.filteredPorts, port)
+			}
+		}
+	}
 	if ui.list != nil {
 		ui.list.Refresh()
 	}
 }
 
 func (ui *PortManagerUI) Setup() {
-	header := container.NewHBox(
-		widget.NewLabel("Active Ports"),
-		layout.NewSpacer(),
-		widget.NewButton("Refresh", ui.updateList),
+	ui.searchEntry = widget.NewEntry()
+	ui.searchEntry.SetPlaceHolder("프로세스 이름으로 검색...")
+	ui.searchEntry.OnChanged = func(text string) {
+		ui.filterPorts(text)
+	}
+
+	header := container.NewVBox(
+		container.NewHBox(
+			widget.NewLabel("Active Ports"),
+			layout.NewSpacer(),
+			widget.NewButton("Refresh", ui.updateList),
+		),
+		ui.searchEntry,
 	)
 
 	ui.list = widget.NewList(
 		func() int {
-			return len(ui.ports)
+			return len(ui.filteredPorts)
 		},
 		func() fyne.CanvasObject {
 			button := widget.NewButton("Terminate", nil)
@@ -95,7 +123,7 @@ func (ui *PortManagerUI) updateListItem(id widget.ListItemID, item fyne.CanvasOb
 	buttonContainer := container.Objects[2].(*fyne.Container)
 	button := buttonContainer.Objects[1].(*widget.Button)
 
-	port := ui.ports[id]
+	port := ui.filteredPorts[id]
 
 	processLabel.SetText(port.ProcessName)
 	processLabel.TextStyle = fyne.TextStyle{Bold: true}
