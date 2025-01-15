@@ -1,6 +1,7 @@
 package process
 
 import (
+	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ func GetActivePorts() ([]types.PortInfo, error) {
 		return nil, err
 	}
 
+	seen := make(map[string]bool)
 	var ports []types.PortInfo
 	lines := strings.Split(string(output), "\n")
 
@@ -46,7 +48,11 @@ func GetActivePorts() ([]types.PortInfo, error) {
 			Port:        parts[len(parts)-1],
 		}
 
-		ports = append(ports, portInfo)
+		key := fmt.Sprintf("%s:%s:%s", portInfo.ProcessName, portInfo.Port, portInfo.PID)
+		if !seen[key] {
+			seen[key] = true
+			ports = append(ports, portInfo)
+		}
 	}
 
 	return ports, nil

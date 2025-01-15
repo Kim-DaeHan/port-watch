@@ -2,13 +2,16 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"github.com/Kim-DaeHan/port-watch/process"
@@ -41,17 +44,32 @@ func (ui *PortManagerUI) updateList() {
 }
 
 func (ui *PortManagerUI) filterPorts(searchText string) {
-	if searchText == "" {
-		ui.filteredPorts = ui.ports
-	} else {
-		ui.filteredPorts = []types.PortInfo{}
-		searchText = strings.ToLower(searchText)
-		for _, port := range ui.ports {
-			if strings.Contains(strings.ToLower(port.ProcessName), searchText) {
-				ui.filteredPorts = append(ui.filteredPorts, port)
-			}
+	var filteredPorts []types.PortInfo
+	seen := make(map[string]bool) // 중복 체크를 위한 맵
+
+	// 중복 체크 키 생성 함수
+	makeKey := func(port types.PortInfo) string {
+		return fmt.Sprintf("%s:%s:%s", port.ProcessName, port.Port, port.PID)
+	}
+
+	// 검색어로 필터링하고 중복 제거
+	for _, port := range ui.ports {
+		// 검색어가 있으면 프로세스 이름으로 필터링
+		if searchText != "" && !strings.Contains(
+			strings.ToLower(port.ProcessName),
+			strings.ToLower(searchText)) {
+			continue
+		}
+
+		// 중복 체크
+		key := makeKey(port)
+		if !seen[key] {
+			seen[key] = true
+			filteredPorts = append(filteredPorts, port)
 		}
 	}
+
+	ui.filteredPorts = filteredPorts
 	if ui.list != nil {
 		ui.list.Refresh()
 	}
@@ -66,7 +84,7 @@ func (ui *PortManagerUI) Setup() {
 
 	header := container.NewVBox(
 		container.NewHBox(
-			widget.NewLabel("Active Ports"),
+			widget.NewLabel("Port Watch"),
 			layout.NewSpacer(),
 			widget.NewButton("Refresh", ui.updateList),
 		),
@@ -78,14 +96,16 @@ func (ui *PortManagerUI) Setup() {
 			return len(ui.filteredPorts)
 		},
 		func() fyne.CanvasObject {
-			button := widget.NewButton("Terminate", nil)
-			button.Resize(fyne.NewSize(100, 35))
+			text := canvas.NewText("", &color.NRGBA{R: 57, G: 255, B: 20, A: 255})
+			text.TextStyle = fyne.TextStyle{Bold: true}
+			text.TextSize = 14
+
+			button := widget.NewButtonWithIcon("", theme.CancelIcon(), nil)
+			button.Importance = widget.DangerImportance
+			button.Resize(fyne.NewSize(45, 35))
 
 			return container.NewHBox(
-				container.NewVBox(
-					widget.NewLabel(""),
-					widget.NewLabel(""),
-				),
+				text,
 				layout.NewSpacer(),
 				container.NewHBox(
 					layout.NewSpacer(),
@@ -117,24 +137,14 @@ func (ui *PortManagerUI) Setup() {
 
 func (ui *PortManagerUI) updateListItem(id widget.ListItemID, item fyne.CanvasObject) {
 	container := item.(*fyne.Container)
-	infoContainer := container.Objects[0].(*fyne.Container)
-	processLabel := infoContainer.Objects[0].(*widget.Label)
-	detailsLabel := infoContainer.Objects[1].(*widget.Label)
+	text := container.Objects[0].(*canvas.Text)
 	buttonContainer := container.Objects[2].(*fyne.Container)
 	button := buttonContainer.Objects[1].(*widget.Button)
 
 	port := ui.filteredPorts[id]
 
-	processLabel.SetText(port.ProcessName)
-	processLabel.TextStyle = fyne.TextStyle{Bold: true}
-	processLabel.Resize(fyne.NewSize(400, 30))
-
-	detailsLabel.SetText(fmt.Sprintf("PID: %s • %s:%s",
-		port.PID,
-		port.Protocol,
-		port.Port))
-	detailsLabel.TextStyle = fyne.TextStyle{Monospace: true}
-	detailsLabel.Resize(fyne.NewSize(400, 30))
+	text.Text = fmt.Sprintf("%s:%s", port.ProcessName, port.Port)
+	text.Refresh()
 
 	canKill, isDangerous := process.CanKillProcess(port.ProcessName, port.PID)
 	if canKill {

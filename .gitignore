@@ -1,0 +1,46 @@
+# Go 관련
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# 바이너리 디렉토리
+bin/
+dist/
+
+# macOS 관련
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+Icon?
+
+# macOS 썸네일
+._*
+
+# macOS 디렉토리
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+# IDE 관련
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 프로젝트 특정 파일
+Port Watch.app/
+*.app/
+
+# Fyne 관련
+fyne-cross/
