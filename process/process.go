@@ -101,3 +101,8 @@ func KillProcess(pid string) error {
 
 	return nil
 }
+
+func ForceKillProcess(processName string) error {
+	cmd := exec.Command("pkill", "-9", processName)
+	return cmd.Run()
+}
