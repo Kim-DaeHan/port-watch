@@ -1,5 +1,9 @@
 # Port Watch
 
+<p align="center">
+  <img src="icon.png" alt="Port Watch Logo" width="200" height="200">
+</p>
+
 A desktop application for monitoring and managing port usage by processes on macOS systems.
 
 ## Features
