@@ -27,7 +27,7 @@ A desktop application for monitoring and managing port usage by processes on mac
 2. Clone the project
 
 ```bash
-git clone https://github.com/Kim-DaeHan/port-watch.git ...
+git clone https://github.com/Kim-DaeHan/port-watch.git
 cd port-watch
 ```
 
